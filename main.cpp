@@ -79,7 +79,167 @@ std::string generate(ll r) {
     }
 
     return problem;   // 返回生成的题目
+}// ========== 分数结构体 ==========
+struct Fraction {
+    ll num;
+    ll den;
+
+    Fraction(ll n = 0, ll d = 1) : num(n), den(d) {
+        if (den < 0) { num = -num; den = -den; }
+        reduce();
+    }
+
+    void reduce() {
+        if (den == 0) throw std::runtime_error("分母为零");
+        ll g = std::gcd(std::abs(num), den);
+        num /= g;
+        den /= g;
+    }
+
+    Fraction operator+(const Fraction& o) const {
+        return Fraction(num * o.den + o.num * den, den * o.den);
+    }
+    Fraction operator-(const Fraction& o) const {
+        return Fraction(num * o.den - o.num * den, den * o.den);
+    }
+    Fraction operator*(const Fraction& o) const {
+        return Fraction(num * o.num, den * o.den);
+    }
+    Fraction operator/(const Fraction& o) const {
+        if (o.num == 0) throw std::runtime_error("除以零");
+        return Fraction(num * o.den, den * o.num);
+    }
+
+    std::string toString() const {
+        if (den == 1) return std::to_string(num);
+        return std::to_string(num) + "/" + std::to_string(den);
+    }
+};
+
+// ========== 运算符优先级 ==========
+int priority(char op) {
+    if (op == '+' || op == '-') return 1;
+    if (op == '*' || op == '/') return 2;
+    return 0;
 }
+
+// ========== 判断是否是运算符 ==========
+bool isOperator(char c) {
+    return c == '+' || c == '-' || c == '*' || c == '/';
+}
+
+// ========== 中缀转后缀（调度场算法） ==========
+std::vector<std::string> infixToPostfix(const std::string& expr) {
+    std::vector<std::string> output;
+    std::stack<char> ops;
+
+    size_t i = 0;
+    while (i < expr.size()) {
+        char c = expr[i];
+
+        if (std::isspace(c)) { i++; continue; }
+
+        // 数字
+        if (std::isdigit(c)) {
+            std::string num;
+            while (i < expr.size() && std::isdigit(expr[i])) {
+                num += expr[i];
+                i++;
+            }
+            output.push_back(num);
+            continue;
+        }
+
+        // 左括号
+        if (c == '(') {
+            ops.push(c);
+            i++;
+            continue;
+        }
+
+        // 右括号
+        if (c == ')') {
+            while (!ops.empty() && ops.top() != '(') {
+                output.push_back(std::string(1, ops.top()));
+                ops.pop();
+            }
+            if (ops.empty()) throw std::runtime_error("括号不匹配");
+            ops.pop();
+            i++;
+            continue;
+        }
+
+        // 除号 ÷（UTF-8 两字节）
+        if ((unsigned char)c == 0xC3 && i + 1 < expr.size() &&
+            (unsigned char)expr[i + 1] == 0xB7) {
+            while (!ops.empty() && priority(ops.top()) >= priority('/')) {
+                output.push_back(std::string(1, ops.top()));
+                ops.pop();
+            }
+            ops.push('/');
+            i += 2;
+            continue;
+        }
+
+        // 普通运算符
+        if (isOperator(c)) {
+            while (!ops.empty() && priority(ops.top()) >= priority(c)) {
+                output.push_back(std::string(1, ops.top()));
+                ops.pop();
+            }
+            ops.push(c);
+            i++;
+            continue;
+        }
+
+        throw std::runtime_error(std::string("非法字符: ") + c);
+    }
+
+    while (!ops.empty()) {
+        if (ops.top() == '(') throw std::runtime_error("括号不匹配");
+        output.push_back(std::string(1, ops.top()));
+        ops.pop();
+    }
+
+    return output;
+}
+
+// ========== 后缀表达式求值（分数） ==========
+Fraction evalPostfix(const std::vector<std::string>& postfix) {
+    std::stack<Fraction> st;
+
+    for (const auto& token : postfix) {
+        // 运算符
+        if (token.size() == 1 && isOperator(token[0])) {
+            if (st.size() < 2) throw std::runtime_error("表达式非法");
+            Fraction b = st.top(); st.pop();
+            Fraction a = st.top(); st.pop();
+            char op = token[0];
+
+            if (op == '+') st.push(a + b);
+            else if (op == '-') st.push(a - b);
+            else if (op == '*') st.push(a * b);
+            else if (op == '/') st.push(a / b);
+        }
+        else {
+            // 数字：当成整数，分母为 1
+            st.push(Fraction(std::stoll(token), 1));
+        }
+    }
+
+    if (st.size() != 1) throw std::runtime_error("表达式非法");
+    return st.top();
+}
+
+// ========== 对外接口：计算表达式 ==========
+// 输入: "3+4*2" 或 "(1+3)*4/5" 或 "3÷4"
+// 输出: 结果字符串，例如 "17/12"
+std::string calculate(const std::string& expr) {
+    auto postfix = infixToPostfix(expr);
+    Fraction result = evalPostfix(postfix);
+    return result.toString();
+}
+
 int main(int argc,char*argv[]){
     ll o=0,n,r;      // o:模式 n:数量 r:范围
     std::string a,e;      // a:答案文件 e:题目文件
