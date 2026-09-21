@@ -2,6 +2,12 @@
 #include<string>
 #include<random>
 #include <numeric>
+#include <stack>
+#include <unordered_map>
+#include <fstream>
+#include <stdexcept>
+#include <cstdlib>
+#include <cctype>
 using ll=long long ;
 std::mt19937_64 gen(std::random_device{}());
 // 打印用法帮助
@@ -136,7 +142,6 @@ std::vector<std::string> infixToPostfix(const std::string& expr) {
     size_t i = 0;
     while (i < expr.size()) {
         char c = expr[i];
-
         if (std::isspace(c)) { i++; continue; }
 
         // 数字
@@ -239,33 +244,39 @@ std::string calculate(const std::string& expr) {
     Fraction result = evalPostfix(postfix);
     return result.toString();
 }
-
+void filewrite(const std::string& filename, const std::string& expr) {
+    std::ofstream fout(filename,std::ofstream::app);
+    fout << expr;
+    fout.close();
+}
 int main(int argc,char*argv[]){
     ll o=0,n,r;      // o:模式 n:数量 r:范围
-    std::string a,e;      // a:答案文件 e:题目文件
-    if(argc<4||argc>4){      // 参数太少
+    std::string a,e,argv1,argv3;      // a:答案文件 e:题目文件
+    if(argc!=5){      // 参数太少
         wrong();
         return 1;
     }
-    if(argv[1]=="-n"&&argv[3]=="-r")   // -n 数量 -r 范围
+    argv1 = argv[1];
+    argv3 = argv[3];
+    if(argv1=="-n"&&argv3=="-r")   // -n 数量 -r 范围
     {
         o=1;
         n=std::stoll(argv[2]);
         r=std::stoll(argv[4]);
     }
-    else if(argv[1]=="-r"&&argv[3]=="-n")  // -r 范围 -n 数量
+    else if(argv1=="-r"&&argv3=="-n")  // -r 范围 -n 数量
     {
         o=1;
         r=std::stoll(argv[2]);
         n=std::stoll(argv[4]);
     }
-    else if(argv[1]=="-e"&&argv[3]=="-a")  // -e 题目 -a 答案
+    else if(argv1=="-e"&&argv3=="-a")  // -e 题目 -a 答案
     {
         o=2;
         a=argv[4];
         e=argv[2];
     }
-    else if(argv[1]=="-a"&&argv[3]=="-e")  // -a 答案 -e 题目
+    else if(argv1=="-a"&&argv3=="-e")  // -a 答案 -e 题目
     {
         o=2;
         a=argv[2];
@@ -276,8 +287,53 @@ int main(int argc,char*argv[]){
         return 1;
     }
     if(o==1){
+        std::ofstream("Exercises.txt", std::ofstream::trunc).close();
+        std::ofstream("Answers.txt", std::ofstream::trunc).close();//清空输出文件
+        std::unordered_map<std::string,ll> p;
+        ll s=0;
         for(ll i=0;i<n;i++){
             std::string problem=generate(r);
+            // 声明一个字符串，用来存放计算出来的答案
+            std::string expr;
+
+            // 计算这道题的答案
+            // calculate 可能抛异常（比如除以零、括号不匹配），所以要用 try 包起来
+            try {
+                expr = calculate(problem);
+            } catch (const std::exception& ex) {
+                // 计算失败，说明这道题非法（比如分母为 0）
+                // i-- 让 for 循环的 i++ 抵消，相当于重新生成这一题
+                i--;
+                continue;
+            }
+            // 判断这个答案是否已经出现过（答案去重）
+            // p 的 key 是答案字符串，value 随便存个 1 表示出现过
+            if (p.find(expr) != p.end()) {
+                // 答案重复，这一题作废
+                i--;          // 让 for 的 i++ 抵消，重新生成这一题
+                s++;          // 重复次数加一
+
+                // 如果重复次数太多，说明范围 r 太小，凑不出 n 道不重复的题
+                // 直接退出程序，避免无限循环
+                if (s > n * 10000) {
+                    return 1;
+                }
+                continue;     // 跳过本轮剩下的写入操作
+            }
+            else {
+                // 答案没出现过，记录下来，防止后面再生成同样的答案
+                p[expr] = 1;
+
+                // 把题目写入 Exercises.txt
+                // 格式: "编号.题目"，例如 "1.3/4+2/3"
+                filewrite("Exercises.txt",
+                          std::to_string(i + 1) + "." + problem + "\n");
+
+                // 把答案写入 Answers.txt
+                // 格式: "编号.答案"，例如 "1.17/12"
+                filewrite("Answers.txt",
+                          std::to_string(i + 1) + "." + expr + "\n");
+            }
         }
     }
     else{
