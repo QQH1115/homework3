@@ -89,7 +89,9 @@ std::string generate(ll r) {
 struct Fraction {
     ll num;
     ll den;
-
+    bool isNegative() const {
+        return num < 0;
+    }//负数检验
     Fraction(ll n = 0, ll d = 1) : num(n), den(d) {
         if (den < 0) { num = -num; den = -den; }
         reduce();
@@ -221,10 +223,18 @@ Fraction evalPostfix(const std::vector<std::string>& postfix) {
             Fraction a = st.top(); st.pop();
             char op = token[0];
 
-            if (op == '+') st.push(a + b);
-            else if (op == '-') st.push(a - b);
-            else if (op == '*') st.push(a * b);
-            else if (op == '/') st.push(a / b);
+            Fraction r;
+            if (op == '+')      r = a + b;
+            else if (op == '-') r = a - b;
+            else if (op == '*') r = a * b;
+            else if (op == '/') r = a / b;
+
+            // 任何一步出现负数，就抛异常，让上层作废重生成
+            if (r.isNegative()) {
+                throw std::runtime_error("出现负数");
+            }
+
+            st.push(r);
         }
         else {
             // 数字：当成整数，分母为 1
@@ -235,7 +245,6 @@ Fraction evalPostfix(const std::vector<std::string>& postfix) {
     if (st.size() != 1) throw std::runtime_error("表达式非法");
     return st.top();
 }
-
 // ========== 对外接口：计算表达式 ==========
 // 输入: "3+4*2" 或 "(1+3)*4/5" 或 "3÷4"
 // 输出: 结果字符串，例如 "17/12"
@@ -304,6 +313,7 @@ int main(int argc,char*argv[]){
                 // 计算失败，说明这道题非法（比如分母为 0）
                 // i-- 让 for 循环的 i++ 抵消，相当于重新生成这一题
                 i--;
+                s++;
                 continue;
             }
             // 判断这个答案是否已经出现过（答案去重）
