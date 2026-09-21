@@ -127,13 +127,13 @@ struct Fraction {
 // ========== 运算符优先级 ==========
 int priority(char op) {
     if (op == '+' || op == '-') return 1;
-    if (op == '*' || op == '/') return 2;
+    if (op == '%') return 2;              // ÷
+    if (op == '*' || op == '/') return 3; // / 优先级更高
     return 0;
 }
-
 // ========== 判断是否是运算符 ==========
 bool isOperator(char c) {
-    return c == '+' || c == '-' || c == '*' || c == '/';
+    return c == '+' || c == '-' || c == '*' || c == '/' || c == '%';
 }
 
 // ========== 中缀转后缀（调度场算法） ==========
@@ -146,10 +146,10 @@ std::vector<std::string> infixToPostfix(const std::string& expr) {
         char c = expr[i];
         if (std::isspace(c)) { i++; continue; }
 
-        // 数字
+        // 数字（含分数形式 a/b）
         if (std::isdigit(c)) {
             std::string num;
-            while (i < expr.size() && std::isdigit(expr[i])) {
+            while (i < expr.size() && (std::isdigit(expr[i]) || expr[i] == '/')) {
                 num += expr[i];
                 i++;
             }
@@ -176,19 +176,19 @@ std::vector<std::string> infixToPostfix(const std::string& expr) {
             continue;
         }
 
-        // 除号 ÷（UTF-8 两字节）
+        // 除号 ÷（UTF-8 两字节）→ 转成 %
         if ((unsigned char)c == 0xC3 && i + 1 < expr.size() &&
             (unsigned char)expr[i + 1] == 0xB7) {
-            while (!ops.empty() && priority(ops.top()) >= priority('/')) {
+            while (!ops.empty() && priority(ops.top()) >= priority('%')) {
                 output.push_back(std::string(1, ops.top()));
                 ops.pop();
             }
-            ops.push('/');
+            ops.push('%');
             i += 2;
             continue;
-        }
+            }
 
-        // 普通运算符
+        // 普通运算符（+ - * /）
         if (isOperator(c)) {
             while (!ops.empty() && priority(ops.top()) >= priority(c)) {
                 output.push_back(std::string(1, ops.top()));
@@ -210,7 +210,6 @@ std::vector<std::string> infixToPostfix(const std::string& expr) {
 
     return output;
 }
-
 // ========== 后缀表达式求值（分数） ==========
 Fraction evalPostfix(const std::vector<std::string>& postfix) {
     std::stack<Fraction> st;
@@ -227,7 +226,7 @@ Fraction evalPostfix(const std::vector<std::string>& postfix) {
             if (op == '+')      r = a + b;
             else if (op == '-') r = a - b;
             else if (op == '*') r = a * b;
-            else if (op == '/') r = a / b;
+            else if (op == '/' || op == '%') r = a / b;
 
             // 任何一步出现负数，就抛异常，让上层作废重生成
             if (r.isNegative()) {
@@ -237,8 +236,15 @@ Fraction evalPostfix(const std::vector<std::string>& postfix) {
             st.push(r);
         }
         else {
-            // 数字：当成整数，分母为 1
-            st.push(Fraction(std::stoll(token), 1));
+            // 数字或分数
+            size_t slash = token.find('/');
+            if (slash == std::string::npos) {
+                st.push(Fraction(std::stoll(token), 1));
+            } else {
+                ll n = std::stoll(token.substr(0, slash));
+                ll d = std::stoll(token.substr(slash + 1));
+                st.push(Fraction(n, d));
+            }
         }
     }
 
@@ -358,6 +364,7 @@ int main(int argc,char*argv[]){
             std::string lineEx, lineAns;
 
             while (std::getline(finEx, lineEx) && std::getline(finAns, lineAns)) {
+
                 // 解析题目行: "1.3/4+2/3"
                 size_t dotEx = lineEx.find('.');
                 ll idx = std::stoll(lineEx.substr(0, dotEx));       // 题号
@@ -366,7 +373,6 @@ int main(int argc,char*argv[]){
                 // 解析答案行: "1.17/12"
                 size_t dotAns = lineAns.find('.');
                 std::string stuAns = lineAns.substr(dotAns + 1);    // 学生答案
-
                 // 计算正确答案（题目保证合法，不会抛异常）
                 std::string correctAns = calculate(expr);
 
