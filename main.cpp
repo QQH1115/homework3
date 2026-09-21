@@ -73,7 +73,7 @@ std::string generate(ll r) {
                 case 1: problem += "+"; break;   // 加
                 case 2: problem += "-"; break;   // 减
                 case 3: problem += "*"; break;   // 乘
-                case 4: problem += "÷"; break;   // 除（Unicode 字符）
+                case 4: problem += "÷"; break;   // 除（Unicode 字符，与分数里的 / 区分）
             }
         } else {
             // 最后一个操作数后，补全所有未匹配的左括号
@@ -127,8 +127,8 @@ struct Fraction {
 // ========== 运算符优先级 ==========
 int priority(char op) {
     if (op == '+' || op == '-') return 1;
-    if (op == '%') return 2;              // ÷
-    if (op == '*' || op == '/') return 3; // / 优先级更高
+    if (op == '%') return 2;              // ÷ 的优先级
+    if (op == '*' || op == '/') return 3; // / 比 ÷ 高，保证 ÷ 后的分数不被拆开
     return 0;
 }
 // ========== 判断是否是运算符 ==========
@@ -146,7 +146,7 @@ std::vector<std::string> infixToPostfix(const std::string& expr) {
         char c = expr[i];
         if (std::isspace(c)) { i++; continue; }
 
-        // 数字（含分数形式 a/b）
+        // 数字（含分数形式 a/b，整体读入，避免把分数的 / 当成除号）
         if (std::isdigit(c)) {
             std::string num;
             while (i < expr.size() && (std::isdigit(expr[i]) || expr[i] == '/')) {
@@ -176,7 +176,7 @@ std::vector<std::string> infixToPostfix(const std::string& expr) {
             continue;
         }
 
-        // 除号 ÷（UTF-8 两字节）→ 转成 %
+        // 除号 ÷（UTF-8 两字节）→ 转成 %，与分数里的 / 区分
         if ((unsigned char)c == 0xC3 && i + 1 < expr.size() &&
             (unsigned char)expr[i + 1] == 0xB7) {
             while (!ops.empty() && priority(ops.top()) >= priority('%')) {
@@ -226,7 +226,7 @@ Fraction evalPostfix(const std::vector<std::string>& postfix) {
             if (op == '+')      r = a + b;
             else if (op == '-') r = a - b;
             else if (op == '*') r = a * b;
-            else if (op == '/' || op == '%') r = a / b;
+            else if (op == '/' || op == '%') r = a / b;   // / 和 % 都当除法
 
             // 任何一步出现负数，就抛异常，让上层作废重生成
             if (r.isNegative()) {
@@ -236,7 +236,7 @@ Fraction evalPostfix(const std::vector<std::string>& postfix) {
             st.push(r);
         }
         else {
-            // 数字或分数
+            // 数字或分数（按第一个 / 拆成分子分母）
             size_t slash = token.find('/');
             if (slash == std::string::npos) {
                 st.push(Fraction(std::stoll(token), 1));
