@@ -337,7 +337,58 @@ int main(int argc,char*argv[]){
         }
     }
     else{
+        // ========== 批改：对比题目和答案，生成 Grade.txt ==========
+        std::ifstream finEx(e);       // 用命令行传入的题目文件
+        std::ifstream finAns(a);      // 用命令行传入的答案文件
+        if (!finEx || !finAns) {
+            std::cerr << "无法打开文件" << std::endl;
+        }
+        else {
+            std::vector<ll> correct, wrong;   // 做对、做错的题号
+            std::string lineEx, lineAns;
 
+            while (std::getline(finEx, lineEx) && std::getline(finAns, lineAns)) {
+                // 解析题目行: "1.3/4+2/3"
+                size_t dotEx = lineEx.find('.');
+                ll idx = std::stoll(lineEx.substr(0, dotEx));       // 题号
+                std::string expr = lineEx.substr(dotEx + 1);        // 表达式
+
+                // 解析答案行: "1.17/12"
+                size_t dotAns = lineAns.find('.');
+                std::string stuAns = lineAns.substr(dotAns + 1);    // 学生答案
+
+                // 计算正确答案（题目保证合法，不会抛异常）
+                std::string correctAns = calculate(expr);
+
+                // 对比
+                if (stuAns == correctAns) {
+                    correct.push_back(idx);
+                } else {
+                    wrong.push_back(idx);
+                }
+            }
+
+            // 清空 Grade.txt
+            std::ofstream("Grade.txt", std::ofstream::trunc).close();
+
+            // Correct 行
+            std::string line = "Correct: " + std::to_string(correct.size()) + " (";
+            for (size_t i = 0; i < correct.size(); i++) {
+                if (i > 0) line += ", ";
+                line += std::to_string(correct[i]);
+            }
+            line += ")\n";
+            filewrite("Grade.txt", line);
+
+            // Wrong 行
+            line = "Wrong: " + std::to_string(wrong.size()) + " (";
+            for (size_t i = 0; i < wrong.size(); i++) {
+                if (i > 0) line += ", ";
+                line += std::to_string(wrong[i]);
+            }
+            line += ")\n";
+            filewrite("Grade.txt", line);
+        }
     }
     return 0;
 }
